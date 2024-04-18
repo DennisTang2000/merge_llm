@@ -501,12 +501,16 @@ class MergingMethod:
             return merged_flattened_param
 
         assert isinstance(scaling_coefficient, float), "wrong type of scaling_coefficient, should be float!"
+        
+        print("ties 1")
 
         models_to_merge_task_vectors = [TaskVector(pretrained_model=merged_model, finetuned_model=model_to_merge, exclude_param_names_regex=exclude_param_names_regex) for model_to_merge in models_to_merge]
 
         flattened_models_to_merge_param = [task_vector_param_dict_to_single_vector(task_vector=task_vector) for task_vector in models_to_merge_task_vectors]
         # Tensor, shape (num_models_to_merge, num_total_params), flattened parameters of individual models that need to be merged
         flattened_models_to_merge_param = torch.vstack(flattened_models_to_merge_param)
+        
+        print("ties 2")
 
         with torch.no_grad():
             # Tensor, shape (num_models_to_merge, num_total_params), mask the smallest-magnitude parameter values using param_value_mask_rate
@@ -517,7 +521,7 @@ class MergingMethod:
 
             # Tensor, shape (num_total_params, ), disjoint merge
             merged_flattened_param = disjoint_merge(flattened_models_to_merge_param=flattened_models_to_merge_param, param_signs=param_signs)
-
+            print("ties 3")
             # merged parameter dictionary
             merged_task_vector_param_dict = single_vector_to_task_vector_param_dict(single_vector=merged_flattened_param, task_vector=models_to_merge_task_vectors[0])
             merged_task_vector = TaskVector(task_vector_param_dict=merged_task_vector_param_dict)
@@ -583,6 +587,7 @@ class MergingMethod:
             if mask_apply_method == "average_merging":
                 merged_params = self.average_merging(models_to_merge=new_models_to_merge, exclude_param_names_regex=exclude_param_names_regex)
             elif mask_apply_method == "task_arithmetic":
+                
                 merged_params = self.task_arithmetic(merged_model=merged_model, models_to_merge=new_models_to_merge, exclude_param_names_regex=exclude_param_names_regex,
                                                      scaling_coefficient=scaling_coefficient)
             elif mask_apply_method == "fisher_merging":
@@ -593,6 +598,7 @@ class MergingMethod:
                 merged_params = self.regmean_merging(models_to_merge=new_models_to_merge, trainers=trainers, exclude_param_names_regex=exclude_param_names_regex,
                                                      nums_regmean_examples=nums_regmean_examples, reduce_non_diagonal_ratio=reduce_non_diagonal_ratio)
             elif mask_apply_method == "ties_merging":
+                print("got into ties")
                 merged_params = self.ties_merging(merged_model=merged_model, models_to_merge=new_models_to_merge, exclude_param_names_regex=exclude_param_names_regex,
                                                   param_value_mask_rate=param_value_mask_rate, scaling_coefficient=scaling_coefficient)
             else:
