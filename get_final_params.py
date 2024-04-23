@@ -1,0 +1,59 @@
+import argparse
+import jsonlines
+import sys
+import shutil
+import logging
+import os
+import time
+from tqdm import tqdm
+import glob
+import json
+import torch
+import datasets
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from vllm import LLM, SamplingParams
+from human_eval.data import write_jsonl, read_problems, stream_jsonl
+import accelerate
+
+from model_merging_methods.merging_methods import *
+from utils.utils import set_random_seed, smart_tokenizer_and_embedding_resize
+from model_merging_methods.mask_weights_utils import mask_model_weights
+from utils.utils import set_random_seed, smart_tokenizer_and_embedding_resize
+from utils.evaluate_llms_utils import batch_data, extract_answer_number, remove_boxed, last_boxed_only_string, process_results, \
+    generate_instruction_following_task_prompt, get_math_task_prompt, generate_code_task_prompt, read_mbpp
+
+from model_merging_methods.task_vector import *
+
+import psutil
+
+def print_cpu_memory_usage():
+    # CPU usage
+    cpu_percent = psutil.cpu_percent(interval=1)
+    print(f'CPU Usage: {cpu_percent}%')
+
+    # Memory usage
+    mem = psutil.virtual_memory()
+    mem_total = mem.total / (1024 ** 3)  # Convert bytes to gigabytes
+    mem_used = mem.used / (1024 ** 3)
+    mem_percent = mem.percent
+    print(f'Memory Usage: {mem_used:.2f}GB / {mem_total:.2f}GB ({mem_percent}%)')
+    
+    
+import time
+
+    
+merging_method = MergingMethod(merging_method_name="ties_merging")
+finetuned_tokenizer = AutoTokenizer.from_pretrained( "../../WizardLM-13B-V1.2", device_map="cpu")
+
+merged_model = merging_method.get_merged_model(merged_model=[],
+                                                       models_to_merge=[],
+                                                       exclude_param_names_regex=[],
+                                                  param_value_mask_rate = 0.8,
+                                                  scaling_coefficient = 0.5)
+
+merged_model.save_pretrained(save_directory="test_ties_v2")
+finetuned_tokenizer.save_pretrained(save_directory="test_ties_v2")
+
+
+print("done")
+

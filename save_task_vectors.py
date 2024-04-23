@@ -22,6 +22,7 @@ from utils.utils import set_random_seed, smart_tokenizer_and_embedding_resize
 from utils.evaluate_llms_utils import batch_data, extract_answer_number, remove_boxed, last_boxed_only_string, process_results, \
     generate_instruction_following_task_prompt, get_math_task_prompt, generate_code_task_prompt, read_mbpp
 
+from model_merging_methods.task_vector import *
 
 import psutil
 
@@ -55,30 +56,68 @@ print(args.coeff)
 
 
 merging_method = MergingMethod(merging_method_name="ties_merging")
-finetuned_model_names = [ "../../WizardLM-13B-V1.2", "../../WizardMath-13B-V1.0", "../../llama-2-13b-code-alpaca"]
+finetuned_model_names = [ "../../WizardLM-13B-V1.2", "../../llama-2-13b-code-alpaca", "../../WizardMath-13B-V1.0"]
+
+
+pretrained_model = AutoModelForCausalLM.from_pretrained("../../Llama-2-13b-hf", device_map="cpu", torch_dtype = torch.float16)
+pretrained_tokenizer = AutoTokenizer.from_pretrained("../../Llama-2-13b-hf", device_map="cpu")
+print_cpu_memory_usage()
+print("one")
 
 
 models_to_merge = []
 finetuned_tokenizers = []
+
+smart_tokenizer_and_embedding_resize(
+            special_tokens_dict=dict(pad_token="[PAD]"),
+            model=pretrained_model,
+            tokenizer=pretrained_tokenizer,
+        )
+
+
+i = 0
 for finetuned_model_name in finetuned_model_names:
-    finetuned_model = AutoModelForCausalLM.from_pretrained(finetuned_model_name, device_map="cpu")
+    finetuned_model = AutoModelForCausalLM.from_pretrained(finetuned_model_name, device_map="cpu", torch_dtype = torch.float16)
     finetuned_tokenizer = AutoTokenizer.from_pretrained(finetuned_model_name, device_map="cpu")
-    models_to_merge.append(finetuned_model)
-    finetuned_tokenizers.append(finetuned_tokenizer)
     
+    
+    
+    
+    smart_tokenizer_and_embedding_resize(
+        special_tokens_dict=dict(pad_token="[PAD]"),
+        model=finetuned_model,
+        tokenizer=finetuned_tokenizer,
+    )
+    
+    
+    vector = TaskVector(pretrained_model=pretrained_model, finetuned_model=finetuned_model, exclude_param_names_regex=[])
+    
+    
+    if i == 0:
+        name = "LM"
+    if i == 1:
+        name = "CODE"
+    if i == 2:
+        name = "MATH"
+        
+    torch.save(vector, "task_vector_" + name + ".pt")
+    i += 1
+    
+    print("saved one!")
+    
+    del vector
     del finetuned_model
     del finetuned_tokenizer
     
+    #models_to_merge.append(finetuned_model)
+    
+    #finetuned_tokenizers.append(finetuned_tokenizer)
     
 print_cpu_memory_usage()   
-print("one")
-
-
-pretrained_model = AutoModelForCausalLM.from_pretrained("../../Llama-2-13b-hf", device_map="cpu")
-pretrained_tokenizer = AutoTokenizer.from_pretrained("../../Llama-2-13b-hf", device_map="cpu")
-print_cpu_memory_usage()
 print("two")
 
+
+"""
 smart_tokenizer_and_embedding_resize(
             special_tokens_dict=dict(pad_token="[PAD]"),
             model=pretrained_model,
@@ -90,6 +129,7 @@ for finetuned_model, finetuned_tokenizer in zip(models_to_merge, finetuned_token
         model=finetuned_model,
         tokenizer=finetuned_tokenizer,
     )
+"""
     
 print("three")
 
@@ -101,8 +141,8 @@ for x in g:
                                                        exclude_param_names_regex=[],
                                                   param_value_mask_rate = 0.8,
                                                   scaling_coefficient = x)
-    merged_model.save_pretrained(save_directory="test_ties_3" + str(x))
-    finetuned_tokenizers[0].save_pretrained(save_directory="test_ties" + str(x))
+    merged_model.save_pretrained(save_directory="test_ties_large" + str(x))
+    finetuned_tokenizers[0].save_pretrained(save_directory="test_ties_large" + str(x))
     
     del merged_model
     
